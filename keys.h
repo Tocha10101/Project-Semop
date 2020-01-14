@@ -1,4 +1,4 @@
-#define BUFF_SIZE       10
+#define BUFF_SIZE       20
 #define ONLY_ONE_KEY    113
 #define NUM_KEY         224
 #define EVEN_KEY        335

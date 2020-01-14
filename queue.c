@@ -8,6 +8,12 @@
 // no need to check if the queue is full
 // in other place this was checked
 
+void initQ(int * queue) {
+    for (int i = 1; i < 1 + BUFF_SIZE; i++) {
+        queue[i] = -1;
+    }
+}
+
 void insertQ(int * queue, int el) {
     queue[queue[0] + 1] = el;
     ++queue[0];
@@ -62,6 +68,6 @@ int checkHeadParityQ(int * queue) {
 }
 
 void sleepRandTime() {
-    int quantum = 1 + rand() % 5;
+    int quantum = 2 + rand() % 3;
     sleep(quantum);
 }
