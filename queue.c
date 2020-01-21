@@ -35,12 +35,12 @@ int getSize(int * queue) {
 }
 
 void printQ(int * queue) {
-    printf("Lenght: %d\nElements:\t", getSize(queue));
+    printf("Lenght: %d\nElements:  ", getSize(queue));
     int i;
     for (i = 0; i < getSize(queue); i++) {
-        printf("%d\t", queue[i + 1]);
+        printf("%d  ", queue[i + 1]);
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 int getEvenQ(int * queue) {

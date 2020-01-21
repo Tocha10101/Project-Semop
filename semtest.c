@@ -10,11 +10,10 @@
 #include "queue.c"
 
 int only_one_id;
-int mutex_num_id;
-int mutex_even_id;
-int mutex_odd_id;
-int filled_id;
-int empty_id;
+int filled_id_a;
+int empty_id_a;
+int filled_id_b;
+int empty_id_b;
 
 int * queue;    // our FIFO buffer
 
@@ -36,109 +35,78 @@ int generateA() {
 
 
 void producerA(void) {
-    // printf("Inside the producer A\n");
     int num;
     for (;;) {
+        bin_sem_wait(empty_id_a);
         bin_sem_wait(only_one_id);
-        // bin_sem_wait(empty_id);
-        bin_sem_wait(mutex_num_id);
-        bin_sem_wait(mutex_even_id);
         if (even < 10) {
             num = generateA();
             printf("Generated even number: %d\n", num);
             insertQ(queue, num);
-            sem_change(empty_id, -1);           // down on non-binary semaphore
-            sem_change(filled_id, 1);              // up on non-binary semaphore
-            ++numbers;
             ++even;
             printQ(queue);
+            sleepRandTime();
         }
-        bin_sem_post(mutex_even_id);
-        bin_sem_post(mutex_num_id);
-        // bin_sem_post(filled_id);
-        sleepRandTime();
         bin_sem_post(only_one_id);
+        bin_sem_post(filled_id_a);
         
     }
 }
 
 
 void producerB(void) {
-    // printf("Inside the producerB\n");
     int num;
     for (;;) {
+        bin_sem_wait(empty_id_b);
         bin_sem_wait(only_one_id);
-        // bin_sem_wait(empty_id);
-        bin_sem_wait(mutex_num_id);
-        bin_sem_wait(mutex_even_id);
-        bin_sem_wait(mutex_odd_id);
-
         if (even > odd) {
             num = generateB();
             printf("Generated odd number: %d\n", num);
             insertQ(queue, num);
-            sem_change(empty_id, -1);
-            sem_change(filled_id, 1);
             ++odd;
-            ++numbers;
             printQ(queue);
+            sleepRandTime();
         }
-        bin_sem_post(mutex_odd_id);
-        bin_sem_post(mutex_even_id);
-        bin_sem_post(mutex_num_id);
-        // bim_sem_post(filled_id);
-        sleepRandTime();
         bin_sem_post(only_one_id);
+        bin_sem_post(filled_id_b);
     }
 }
 
 void consumerA(void) {
-    // printf("Inside the consumer A\n");
     int num;
     for(;;) {
+        bin_sem_wait(filled_id_a);
         bin_sem_wait(only_one_id);
-        // bin_sem_wait(filled_id);
-        bin_sem_wait(mutex_num_id);
-        bin_sem_wait(mutex_even_id);
+        numbers = queue[0];
+
         if (numbers >= 3 && checkHeadParityQ(queue) == 0) {
             num = popQ(queue);
             printf("Popped even number: %d\n", num);
-            sem_change(filled_id, -1);
-            sem_change(empty_id, 1);
-            --numbers;
-            --even;
             printQ(queue);
+            --even;
+            sleepRandTime();
         }
-        bin_sem_post(mutex_even_id);
-        bin_sem_post(mutex_num_id);
-        // bin_sem_post(empty_id);
-        sleepRandTime();
         bin_sem_post(only_one_id);
-        
+        bin_sem_post(empty_id_a);
     }
 }
 
 
 void consumerB(void) {
-    // printf("Inside the consumer B\n");
     int num;
     for(;;) {
+        bin_sem_wait(filled_id_b);
         bin_sem_wait(only_one_id);
-        bin_sem_wait(mutex_num_id);
-        bin_sem_wait(mutex_odd_id);
+        numbers = queue[0];
         if (numbers >= 7 && checkHeadParityQ(queue) == 1) {
             num = popQ(queue);
-            printf("Popped odd number: %d\n", num);
-            sem_change(filled_id, -1);
-            sem_change(empty_id, 1);
-            --numbers;
             --odd;
+            printf("Popped odd number: %d\n", num);
             printQ(queue);
+            sleepRandTime();
         }
-        bin_sem_post(mutex_odd_id);
-        bin_sem_post(mutex_num_id);
-        sleepRandTime();
         bin_sem_post(only_one_id);
+        bin_sem_post(empty_id_b);
     }
 }
 
@@ -147,34 +115,36 @@ int main(int argc, char ** argv) {
 
     // allocation of the semaphores
     only_one_id = bin_sem_alloc(ONLY_ONE_KEY, IPC_CREAT);
-    mutex_num_id = bin_sem_alloc(NUM_KEY, IPC_CREAT);
-    mutex_even_id = bin_sem_alloc(EVEN_KEY, IPC_CREAT);
-    mutex_odd_id = bin_sem_alloc(ODD_KEY, IPC_CREAT);
-    filled_id = sem_alloc(FILLED_KEY, IPC_CREAT);
-    empty_id = sem_alloc(EMPTY_KEY, IPC_CREAT);
+    filled_id_a = sem_alloc(FILLED_A_KEY, IPC_CREAT);
+    empty_id_a = sem_alloc(EMPTY_A_KEY, IPC_CREAT);
+    filled_id_b = sem_alloc(FILLED_B_KEY, IPC_CREAT);
+    empty_id_b = sem_alloc(EMPTY_B_KEY, IPC_CREAT);
 
 
     // initialization
     bin_sem_init(only_one_id, 1);
-    bin_sem_init(mutex_num_id, 1);
-    bin_sem_init(mutex_even_id, 1);
-    bin_sem_init(mutex_odd_id, 1);
-    sem_init(filled_id, 0);
-    sem_init(empty_id, BUFF_SIZE);
+    sem_init(filled_id_a, 0);
+    sem_init(filled_id_b, 0);
 
+    if (BUFF_SIZE % 2 == 0) {
+        sem_init(empty_id_a, BUFF_SIZE / 2);
+    } else {
+        sem_init(empty_id_a, BUFF_SIZE / 2 + 1);
+    }
+    sem_init(empty_id_b, BUFF_SIZE / 2);
     
     int queue_id;
     struct shmid_ds shmbuffer;
     int seg_size, n, data, sem_data;
     // allocation for shared memory
     n = BUFF_SIZE;
-    printf("N is %d\n", n);
-    //n = atoi(argv[1]);
+    
     seg_size = (n + 1) * sizeof(int);
     printf("Bytes to allocate: %d\n", seg_size);
+
     srand(time(NULL));
     // connection with our queue
-    key_t key = ftok("/tmp", BUFF_SIZE); // this is misterious
+    key_t key = ftok("/tmp", BUFF_SIZE);
 
     if (key < 0) {
         perror("ftok\n");
@@ -193,36 +163,19 @@ int main(int argc, char ** argv) {
     printf("Seg size is : %d\n", seg_size);
 
     printf("Actually allocated: %d\n", (int) sizeof(&queue));
-    printf("Second phase\n");
-    queue[0] = 0;               // here is a segmentation fault
+    queue[0] = 0;
     initQ(queue);
     printQ(queue);
-    printf("After the queue things\n");
-    // exit(0);
-    pthread_t producer_a_thr, producer_b_thr, consumer_a_thr, consumer_b_thr;
-    // pthread_t thread_id;
-    printf("Before threads\n");
-    pthread_create(&producer_a_thr, NULL, producerA, (void*) NULL);
-    pthread_create(&producer_b_thr, NULL, producerB, (void*) NULL);
+    pthread_t producer_a_thr, producer_b_thr, consumer_a_thr, consumer_b_thr, producer_c_thr, producer_d_thr;
+    
+    pthread_create(&producer_c_thr, NULL, producerA, (void*) NULL);
+    pthread_create(&producer_d_thr, NULL, producerB, (void*) NULL);
     pthread_create(&consumer_a_thr, NULL, consumerA, (void*) NULL);
     pthread_create(&consumer_b_thr, NULL, consumerB, (void*) NULL);
-
-    // pthread_join(&producer_a_thr, NULL);
-    // pthread_join(&producer_b_thr, NULL);
-    // pthread_join(&consumer_a_thr, NULL);
-    // pthread_join(&consumer_b_thr, NULL);
+    pthread_create(&producer_a_thr, NULL, producerA, (void*) NULL);
+    pthread_create(&producer_b_thr, NULL, producerB, (void*) NULL);
+    // pthread_create(&consumer_c_thr, NULL, consumerA, (void*) NULL);
     pthread_exit(NULL);
-
-    printf("After threads\n");
-
-    // int alpha;
-    // int betha;
-    // for (int i = 0; i < 10; i++) {
-    //     alpha = generateB();
-    //     printf("Generated number: %d\n", alpha);
-    // }
-    
-    // printf("Something\n");
 
     
     return 0;
